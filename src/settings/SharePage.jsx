@@ -62,8 +62,8 @@ const SharePage = () => {
             <TextField
               label={t('userExpirationTime')}
               type="date"
-              value={expiration}
-              onChange={(e) => setExpiration(e.target.value)}
+              value={(expiration && dayjs(expiration).locale('en').format('YYYY-MM-DD')) || '2099-01-01'}
+              onChange={(e) => setExpiration(dayjs(e.target.value, 'YYYY-MM-DD').locale('en').format())}
             />
             <Button
               variant="outlined"

@@ -1,15 +1,31 @@
-import { useId, useEffect } from 'react';
+import { useId, useEffect, useCallback } from 'react';
+import maplibregl from 'maplibre-gl';
 import { useTheme } from '@mui/styles';
 import { useMediaQuery } from '@mui/material';
 import { map } from './core/MapView';
 import { useAttributePreference } from '../common/util/preferences';
 
-const MapMarkers = ({ markers, showTitles }) => {
+const MapMarkers = ({ markers, showTitles, clickable }) => {
   const id = useId();
 
   const theme = useTheme();
   const desktop = useMediaQuery(theme.breakpoints.up('md'));
   const iconScale = useAttributePreference('iconScale', desktop ? 0.75 : 1);
+
+  const onMouseEnter = () => map.getCanvas().style.cursor = 'pointer';
+  const onMouseLeave = () => map.getCanvas().style.cursor = '';
+
+  const onMarkerClick = useCallback((event) => {
+    event.preventDefault();
+    const feature = event.features[0];
+    const popup = feature.properties.popup;
+    if (popup) {
+      new maplibregl.Popup()
+        .setLngLat(feature.geometry.coordinates)
+        .setHTML(popup)
+        .addTo(map);
+    }
+  }, []);
 
   useEffect(() => {
     map.addSource(id, {
@@ -54,7 +70,15 @@ const MapMarkers = ({ markers, showTitles }) => {
       });
     }
 
+    map.on('mouseenter', id, onMouseEnter);
+    map.on('mouseleave', id, onMouseLeave);
+    map.on('click', id, onMarkerClick);
+
     return () => {
+      map.off('mouseenter', id, onMouseEnter);
+      map.off('mouseleave', id, onMouseLeave);
+      map.off('click', id, onMarkerClick);
+
       if (map.getLayer(id)) {
         map.removeLayer(id);
       }
@@ -67,7 +91,7 @@ const MapMarkers = ({ markers, showTitles }) => {
   useEffect(() => {
     map.getSource(id)?.setData({
       type: 'FeatureCollection',
-      features: markers.map(({ latitude, longitude, image, title }) => ({
+      features: markers.map(({ latitude, longitude, image, title, popup }) => ({
         type: 'Feature',
         geometry: {
           type: 'Point',
@@ -76,6 +100,7 @@ const MapMarkers = ({ markers, showTitles }) => {
         properties: {
           image: image || 'default-neutral',
           title: title || '',
+          popup,
         },
       })),
     });
