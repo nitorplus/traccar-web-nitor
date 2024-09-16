@@ -12,12 +12,19 @@ import {
   InputAdornment,
   OutlinedInput,
   FormControl,
+  Accordion,
+  AccordionSummary,
+  AccordionDetails,
+  useTheme,
+  Box,
+  TableContainer,
+  Paper,
 } from '@mui/material';
 import makeStyles from '@mui/styles/makeStyles';
-import { useTheme } from '@mui/material/styles';
 import Drawer from '@mui/material/Drawer';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import SearchIcon from '@mui/icons-material/Search';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { useNavigate, useParams } from 'react-router-dom';
 import MapView from '../map/core/MapView';
 import MapCurrentLocation from '../map/MapCurrentLocation';
@@ -67,6 +74,15 @@ const useStyles = makeStyles((theme) => ({
   },
   fileInput: {
     display: 'none',
+  },
+  delivered: {
+    backgroundColor: '#d4edda', // Light green for delivered
+  },
+  undelivered: {
+    backgroundColor: '#f8d7da', // Light red for undelivered
+  },
+  blackText: {
+    color: '#000 !important', // Set font color to black
   },
 }));
 
@@ -153,12 +169,14 @@ const JobsPage = () => {
     if (response.ok) {
       const stops = await response.json();
       setStopMarkers(
-        stops.map((stop) => ({
-          latitude: stop.latitude,
-          longitude: stop.longitude,
-          image: 'person-info',
-          popup: `<div style="color: black;">Time: ${formatTime(stop.startTime, 'minutes')}<br>Duration: ${formatNumericHours(stop.duration, t)}</div>`,
-        })),
+        stops.map((stop) => {
+          return {
+            latitude: stop.latitude,
+            longitude: stop.longitude,
+            image: 'person-info',
+            popup: `<div style="color: black;"><strong>Stop<strong> <br>Time: ${formatTime(stop.startTime, 'minutes')}<br>Duration: ${formatNumericHours(stop.duration, t)}</div>`,
+          };
+        }),
       );
     } else {
       throw Error(await response.text());
@@ -189,6 +207,7 @@ const JobsPage = () => {
             latitude: positions[positions.length - 1].latitude,
             longitude: positions[positions.length - 1].longitude,
             image: 'default-error',
+            popup: `<div style="color: black;"><strong>FINISH<strong></div>`,
           },
         ]);
       }
@@ -196,6 +215,23 @@ const JobsPage = () => {
       throw Error(await response.text());
     }
   }, [deviceId, day, setPositions, setPositionMarkers]);
+
+  // Group jobs by JobOrder
+  const groupedJobs = jobs.reduce((acc, job) => {
+    if (!acc[job.JobOrder]) {
+      acc[job.JobOrder] = [];
+    }
+    acc[job.JobOrder].push(job);
+    return acc;
+  }, {});
+
+  // Create markers with color based on delivery status
+  // const jobMarkers = jobsWithLocation.map((job) => ({
+  //   latitude: job.latitudeValues,
+  //   longitude: job.longitudeValues,
+  //   image: job.PODRecieved < 0 ? 'default-success' : 'default-error', // Green for delivered, red for undelivered
+  //   popup: `<div style="color: black;"><strong>Job<strong> <br>POD: ${job.PODRecieved}</div>`,
+  // }));
 
   return (
     <div className={classes.root}>
@@ -237,28 +273,68 @@ const JobsPage = () => {
             </List>
           )}
           <Divider />
-          <Table>
-            <TableHead>
-              <TableRow>
-                <TableCell>Job Order</TableCell>
-                <TableCell>Collect From</TableCell>
-                <TableCell>Deliver To</TableCell>
-                <TableCell>Postcode</TableCell>
-                <TableCell>Status</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {jobs?.map((job) => (
-                <TableRow key={job.RowID}>
-                  <TableCell>{job.JobOrder}</TableCell>
-                  <TableCell>{job.Collect1}</TableCell>
-                  <TableCell>{job.Deliver1}</TableCell>
-                  <TableCell>{job.latitudeValues && job.longitudeValues ? job.DPostCode : 'No location'}</TableCell>
-                  <TableCell>{job.PODRecieved < 0 ? 'Delivered' : 'Un-delivered'}</TableCell>
+          <TableContainer component={Paper}>
+          <Table className={classes.blackText}>
+          {/* <TableHead>
+                <TableRow>
+                  <TableCell>Job Order</TableCell>
+                  <TableCell>Collect From</TableCell>
+                  <TableCell>Deliver To</TableCell>
+                  <TableCell>Postcode</TableCell>
+                  <TableCell>Status</TableCell>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHead> */}
+              <TableBody>
+              {Object.entries(groupedJobs).map(([jobOrder, jobGroup]) => {
+  // Determine the overall status based on jobs in the group
+  const isUndelivered = jobGroup.some((job) => job.PODRecieved >= 0);
+  const accordionClass = isUndelivered ? classes.undelivered : classes.delivered;
+
+  return (
+    <React.Fragment key={jobOrder}>
+            <TableRow className={classes.blackText}> {/* Apply the blackText class here if needed */}
+        <TableCell colSpan={5}>
+          <Accordion className={accordionClass}>
+            <AccordionSummary style={{ color: '#000' }} expandIcon={<ExpandMoreIcon />}>
+              <Typography style={{ color: '#000' }}>Job Order: {jobOrder}</Typography>
+            </AccordionSummary>
+            <AccordionDetails sx={{ padding: 0 }}>
+            <Table size="small" className={classes.blackText}> {/* Or apply here */}
+            <TableHead>
+            <TableRow className={classes.blackText}>
+                    <TableCell style={{ color: '#000' }}>Job Order</TableCell>
+                    <TableCell style={{ color: '#000' }}>Collect</TableCell>
+                    <TableCell style={{ color: '#000' }}>Deliver</TableCell>
+                    <TableCell style={{ color: '#000' }}>Postcode</TableCell>
+                    <TableCell style={{ color: '#000' }}>Status</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {jobGroup.map((job) => (
+                    <TableRow
+                    key={job.RowID}
+                    className={`${classes.blackText} ${job.PODRecieved < 0 ? classes.delivered : classes.undelivered}`}
+                  >
+                      <TableCell style={{ color: '#000' }}>{job.JobOrder}</TableCell>
+                      <TableCell style={{ color: '#000' }}>{job.Collect1}</TableCell>
+                      <TableCell style={{ color: '#000' }}>{job.Deliver1}</TableCell>
+                      <TableCell style={{ color: '#000' }}>{job.latitudeValues && job.longitudeValues ? job.DPostCode : 'No location'}</TableCell>
+                      <TableCell style={{ color: '#000' }}>{job.PODRecieved < 0 ? 'Delivered' : 'Un-delivered'}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </AccordionDetails>
+          </Accordion>
+        </TableCell>
+      </TableRow>
+    </React.Fragment>
+  );
+})}
+
+              </TableBody>
+            </Table>
+          </TableContainer>
         </Drawer>
         <div className={classes.mapContainer}>
           <MapView>
@@ -272,6 +348,7 @@ const JobsPage = () => {
               coordinates={jobsWithLocation?.map((job) => ([Number(job.latitudeValues), Number(job.longitudeValues)]))}
               deviceId={deviceId}
             />
+
           </MapView>
           <MapCurrentLocation />
           <MapGeocoder />
