@@ -129,6 +129,9 @@ export const getBatteryStatus = (batteryLevel) => {
 };
 
 export const formatNotificationTitle = (t, notification, includeId) => {
+  if (notification.description) {
+    return notification.description;
+  }
   let title = t(prefixString('event', notification.type));
   if (notification.type === 'alarm') {
     const alarmString = notification.attributes.alarms;
